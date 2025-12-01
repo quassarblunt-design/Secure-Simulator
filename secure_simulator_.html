@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Secure Simulator</title>
+<style>
+  * { box-sizing:border-box; }
+  body { margin:0; padding:0; font-family:sans-serif; background:black; color:white; display:flex; flex-direction:column; align-items:center; justify-content:flex-start; height:100vh; overflow:hidden; }
+  h1 { text-align:center; color:yellow; text-shadow:1px 1px 2px black; letter-spacing:2px; margin:10px 0; font-size:28px; line-height:34px; }
+  .center { display:flex; align-items:center; justify-content:center; flex-direction:column; }
+  button { cursor:pointer; font-weight:bold; border:none; border-radius:10px; display:flex; align-items:center; justify-content:center; text-align:center; }
+  .blue { background:#1E90FF; color:white; }
+  .red { background:#FF4C4C; color:white; }
+  .green { background:#32CD32; color:white; }
+  .gray { background:#888; color:white; }
+  #objective {
+    width:160px;
+    height:160px;
+    border-radius:50%;
+    background:#32CD32;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-weight:bold;
+    font-size:16px;
+    text-align:center;
+    line-height:18px;
+    box-shadow:0 0 20px 6px rgba(50,205,50,0.8);
+    margin:10px;
+  }
+  #hp-bar { width:160px; height:16px; background:#800000; border-radius:8px; overflow:hidden; margin-top:6px; }
+  #hp-fill { height:100%; background:#32CD32; transition: width 0.05s; }
+  .shake { animation: shake 0.3s infinite; }
+  @keyframes shake { 0%,100%{transform:translateX(0);} 25%{transform:translateX(-5px);} 50%{transform:translateX(5px);} 75%{transform:translateX(-5px);} }
+  #watermark { position:absolute; bottom:2px; right:2px; font-size:10px; color:gray; pointer-events:none; user-select:none; }
+  #controls { display:flex; justify-content:space-around; width:220px; margin-top:20px; }
+  .slider-container { display:flex; flex-direction:column; align-items:center; margin-top:10px; }
+  .slider-label { font-size:13px; margin-bottom:4px; text-align:center; }
+  #stats { background:#222; width:90%; max-width:450px; height:60px; margin-top:10px; padding:6px; border-radius:4px; font-size:14px; text-align:center; display:flex; justify-content:space-around; }
+</style>
+</head>
+<body>
+
+<h1>Asegura el Objetivo / Secure the Objective</h1>
+
+<div class="slider-container">
+  <div class="slider-label">Vida máxima / Max HP: <span id="maxHP-label">1000</span></div>
+  <input id="maxHP" type="range" min="100" max="5000" step="50" value="1000" style="width:180px;">
+  
+  <div class="slider-label" style="margin-top:6px;">Daño Secure / Secure Damage: <span id="secure-label">100</span></div>
+  <input id="secure" type="range" min="10" max="500" step="10" value="100" style="width:180px;">
+  
+  <div class="slider-label" style="margin-top:6px;">Velocidad HP / HP Speed: <span id="speed-label">1200</span></div>
+  <input id="speed" type="range" min="100" max="5000" step="50" value="1200" style="width:180px;">
+
+  <button id="reset-btn" class="gray" style="padding:8px 16px; margin-top:6px;">Reset / Reiniciar</button>
+</div>
+
+<div class="center">
+  <!-- Objetivo -->
+  <div class="center">
+    <div id="objective">OBJETIVO / TARGET</div>
+    <div id="hp-bar"><div id="hp-fill"></div></div>
+    <div id="result" style="margin-top:6px; font-size:18px; color:yellow; text-shadow:1px 1px 2px black;"></div>
+  </div>
+
+  <!-- Botones Iniciar y Secure abajo a los lados -->
+  <div id="controls">
+    <button id="start-btn" class="blue" style="width:90px; height:90px; font-size:16px;">Iniciar / Start</button>
+    <button id="secure-btn" class="red" style="width:90px; height:90px; font-size:16px;">Secure</button>
+  </div>
+</div>
+
+<div id="stats">
+  <div>Intentos Totales / Total Attempts: <span id="total-attempts">0</span></div>
+  <div>Intentos Exitosos / Successful: <span id="success-attempts">0</span></div>
+</div>
+
+<div id="watermark">Made by NegatedOTP / Hecho por NegatedOTP</div>
+
+<script>
+let BASE_HP=1000, BASE_SPEED=1200, BASE_SECURE=100;
+let maxHP=BASE_HP, hp=BASE_HP, speed=BASE_SPEED, secureDamage=BASE_SECURE;
+let running=false, interval;
+let totalAttempts=0, successAttempts=0;
+
+const objective=document.getElementById("objective");
+const hpFill=document.getElementById("hp-fill");
+const resultDiv=document.getElementById("result");
+const totalSpan=document.getElementById("total-attempts");
+const successSpan=document.getElementById("success-attempts");
+
+const maxHPSlider=document.getElementById("maxHP");
+const secureSlider=document.getElementById("secure");
+const speedSlider=document.getElementById("speed");
+
+const maxHPLabel=document.getElementById("maxHP-label");
+const secureLabel=document.getElementById("secure-label");
+const speedLabel=document.getElementById("speed-label");
+
+maxHPSlider.addEventListener("input",()=>{ maxHPLabel.innerText=maxHPSlider.value; maxHP=parseInt(maxHPSlider.value); });
+secureSlider.addEventListener("input",()=>{ secureLabel.innerText=secureSlider.value; secureDamage=parseInt(secureSlider.value); });
+speedSlider.addEventListener("input",()=>{ speedLabel.innerText=speedSlider.value; speed=parseInt(speedSlider.value); });
+
+document.getElementById("reset-btn").addEventListener("click",()=>{
+  maxHP=BASE_HP; hp=BASE_HP; speed=BASE_SPEED; secureDamage=BASE_SECURE;
+  maxHPSlider.value=BASE_HP; secureSlider.value=BASE_SECURE; speedSlider.value=BASE_SPEED;
+  maxHPLabel.innerText=BASE_HP; secureLabel.innerText=BASE_SECURE; speedLabel.innerText=BASE_SPEED;
+  totalAttempts=0; successAttempts=0;
+  totalSpan.innerText=totalAttempts; successSpan.innerText=successAttempts;
+  resultDiv.innerText="";
+  hpFill.style.width=(hp/maxHP*100)+"%";
+});
+
+document.getElementById("start-btn").addEventListener("click",()=>{
+  hp=maxHP; running=true; resultDiv.innerText="";
+  objective.classList.add("shake");
+  totalAttempts++;
+  totalSpan.innerText=totalAttempts;
+  if(interval) clearInterval(interval);
+  interval=setInterval(()=>{
+    hp=Math.max(0,hp-speed/10);
+    hpFill.style.width=(hp/maxHP*100)+"%";
+    if(hp<=0){running=false; clearInterval(interval); resultDiv.innerText="💀 Fallaste / Failed"; objective.classList.remove("shake");}
+  },50);
+});
+
+document.getElementById("secure-btn").addEventListener("click",()=>{
+  if(!running) return;
+  hp=Math.max(0,hp-secureDamage);
+  hpFill.style.width=(hp/maxHP*100)+"%";
+  if(hp<=0){running=false; clearInterval(interval); resultDiv.innerText="🏆 ¡Asegurado! / Secured!"; objective.classList.remove("shake"); successAttempts++; successSpan.innerText=successAttempts;}
+});
+</script>
+
+</body>
+</html>
